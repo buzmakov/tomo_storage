@@ -91,48 +91,55 @@ def allowed_file(filename):
 #                       )
 
 
-@app.route("/files", methods=['GET', 'POST'])
-@app.route("/files/<file_id>", methods=['GET', 'DELETE'])
+@app.route("/files", methods=['GET'])
 @auth.login_required
-def files(file_id=None):
-    if request.method == 'POST':
-        file = request.files['file']
-        response = {}
-        if file and allowed_file(file.filename):
-            file_tags = {'original_file_name': file.filename}
-            file_tags.update(request.form)
-            file_descr, file_path = tempfile.mkstemp(
-                dir=app.config['UPLOAD_FOLDER'])
-            file_obj = os.fdopen(file_descr, 'w')
-            file.save(file_obj)
-            file_obj.close()
-            status = storage_core.store_file(file_path, file_tags)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            response.update(status)
-        else:
-            return make_response(jsonify(
-                {'error': 'Unsupported file extension'}), 400)
-        return make_response(jsonify(response))
-    elif request.method == 'GET':
-        if file_id is not None:
-            file_dict = storage_core.get_file_info(file_id)
-            if not file_dict['status'] == 'ok':
-                return abort(404)
-            print file_dict['status'], file_dict['file_name']
-            if os.path.isfile(file_dict['file_name']):
-                return send_file(file_dict['file_name'], as_attachment=True)
-            else:
-                return abort(404)
-        else:
-            return make_response(jsonify(
-                {'status': 'ok', 'id': storage_core.get_files_list()}), 200)
-    elif request.method == 'DELETE':
-        if file_id is not None:
-            delete_info = storage_core.delete_file(file_id)
-            return make_response(jsonify(delete_info))
-        else:
-            return abort(404)
+def files_listfiles(file_id=None):
+    return make_response(jsonify(
+        {'status': 'ok', 'id': storage_core.get_files_list()}), 200)
+
+
+@app.route("/files", methods=['POST'])
+@auth.login_required
+def post_file():
+    file = request.files['file']
+    response = {}
+    if file and allowed_file(file.filename):
+        file_tags = {'original_file_name': file.filename}
+        file_tags.update(request.form)
+        file_descr, file_path = tempfile.mkstemp(
+            dir=app.config['UPLOAD_FOLDER'])
+        file_obj = os.fdopen(file_descr, 'w')
+        file.save(file_obj)
+        file_obj.close()
+        status = storage_core.store_file(file_path, file_tags)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        response.update(status)
+    else:
+        return make_response(jsonify(
+            {'error': 'Unsupported file extension'}), 400)
+    return make_response(jsonify(response))
+
+
+@app.route("/files/<file_id>", methods=['GET'])
+@auth.login_required
+def get_file(file_id):
+    file_dict = storage_core.get_file_info(file_id)
+    if not file_dict['status'] == 'ok':
+        return abort(404)
+    print file_dict['status'], file_dict['file_name']
+    if os.path.isfile(file_dict['file_name']):
+        return send_file(file_dict['file_name'], as_attachment=True)
+    else:
+        return abort(404)
+
+
+@app.route("/files/<file_id>", methods=['DELETE'])
+@auth.login_required
+def delete_file(file_id):
+    delete_info = storage_core.delete_file(file_id)
+    return make_response(jsonify(delete_info))
+
 
 if __name__ == '__main__':
     app.run(debug=True)
